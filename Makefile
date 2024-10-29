@@ -1,7 +1,9 @@
-CONTIKI_PROJECT = main
+CONTIKI_PROJECT = nodo udp-server
 all: $(CONTIKI_PROJECT)
 
-#MODULES_REL += $(TARGET)
+MAKE_MAC = MAKE_MAC_TSCH
 
-CONTIKI = ../..
+CONTIKI = /home/user/contiki-ng
+MODULES += os/services/shell
+#MODULES += os/services/orchestra
 include $(CONTIKI)/Makefile.include
