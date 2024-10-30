@@ -7,9 +7,9 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include "dev/button-hal.h"
-
+#include "sys/timer.h"
 #include "sys/log.h"
-
+#include "net/mac/tsch/tsch.h"
 #define LOG_MODULE "Nodo"
 #define LOG_LEVEL LOG_LEVEL_INFO
 
@@ -17,12 +17,12 @@
 #define UDP_PORT 5678
 
 #define DISTANCE 1 // en metro
-
+#define MAX_VEL 0.3
 #define SENSOR_ACT_MSG "SENSOR_ACT"
 
 static bool waiting_for_sensor = false;
 static struct simple_udp_connection udp_conn; // udp_conn saves info of the comunication
-static clock_time_t t_init;
+static unsigned long long int t_init;
 
 static uip_ipaddr_t ip_server;
 static uip_ipaddr_t ip_next;
@@ -47,22 +47,22 @@ udp_rx_callback(struct simple_udp_connection *c,
   LOG_INFO_("\n");
 
   LOG_INFO("uip condition: %u\n", uip_ip6addr_cmp(sender_addr, &ip_prev));
-  LOG_INFO("strmp condition: %u\n", strcmp((const char*)data, SENSOR_ACT_MSG));
-
+  //LOG_INFO("strmp condition: %u\n", strcmp((const char*)data[1], SENSOR_ACT_MSG));
+  char received_msg[20];
+  unsigned long long int received_time;
   // si el mensaje me lo manda el nodo anterior y es el mensaje de activacion de sensor
-  if (uip_ip6addr_cmp(sender_addr, &ip_prev) && strcmp((const char*)data, SENSOR_ACT_MSG) == 0)
+  if (uip_ip6addr_cmp(sender_addr, &ip_prev) && (sscanf((const char *)data, "%s %llu", received_msg, &received_time) == 2) && strcmp(received_msg, SENSOR_ACT_MSG)==0)
   {
     waiting_for_sensor = true;
-    clock_init();
-    t_init = clock_time();
-    LOG_INFO("Esperando por sensor. Tiempo inicial: %lu\n", t_init);
+    t_init = received_time;
+    LOG_INFO("Esperando por sensor. Tiempo inicial: %llu\n", received_time);
   }
 }
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(udp_process, ev, data)
 {
   static button_hal_button_t *btn;
-  static char str[36];
+  static char str[50];
 
   PROCESS_BEGIN();
 
@@ -91,18 +91,32 @@ PROCESS_THREAD(udp_process, ev, data)
       // Check that the pressed button is BTN-1
       if (btn == button_hal_get_by_id(BUTTON_HAL_ID_BUTTON_ZERO))
       {
+        unsigned long long int t_local = tsch_get_network_uptime_ticks();
+        snprintf(str, sizeof(str), "%s %llu", SENSOR_ACT_MSG, t_local);
+        
         // mandar mensaje a siguiente nodo
-        snprintf(str, sizeof(str), SENSOR_ACT_MSG);
         simple_udp_sendto(&udp_conn, str, strlen(str), &ip_next);
-
+        
         if (waiting_for_sensor)
         {
-          // parar timer, calcular velocidad
-          clock_time_t delta_t = clock_time() - t_init;
-          float vel = (DISTANCE * 10000) / delta_t;
-          LOG_INFO("Velocidad detectada: %f\n", vel);
-          LOG_INFO("Diferencia de tiempo: %lu\n", delta_t);
-
+          // parar timer, calcular velocidad(en ticks)
+          unsigned long long int t_final = tsch_get_network_uptime_ticks();
+          uint64_t t_ticks = t_final - t_init; 
+          float delta_t = t_ticks/CLOCK_SECOND; 
+          
+          float vel = (DISTANCE) / delta_t;
+          if (vel < MAX_VEL){
+            LOG_INFO("TODO EN ORDEN");
+            LOG_INFO("tiempo final: %llu\n",t_final );
+            LOG_INFO("Velocidad detectada (m/s): %f\n", vel);
+            LOG_INFO("Diferencia de tiempo (s): %f\n", delta_t);
+          }
+          else {
+            LOG_INFO("ALERTA: VELOCIDAD MAXIMA SUPERADA");
+            LOG_INFO("tiempo final: %llu\n",t_final );
+            LOG_INFO("Velocidad detectada (m/s): %f\n", vel);
+            LOG_INFO("Diferencia de tiempo (s): %f\n", delta_t);
+          }
           snprintf(str, sizeof(str), "VEL:%f", vel);
           simple_udp_sendto(&udp_conn, str, strlen(str), &ip_server);
 
