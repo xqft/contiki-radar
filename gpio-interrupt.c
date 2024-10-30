@@ -56,7 +56,6 @@ static gpio_interrupt_handler_t handlers[NUM_IO_MAX];
 void
 gpio_interrupt_isr(void)
 {
-  LOG_INFO("got interrupt");
   uint32_t pin_mask;
   uint8_t i;
 
@@ -70,12 +69,8 @@ gpio_interrupt_isr(void)
 
   /* Run custom ISRs */
   for(i = 0; i < NUM_IO_MAX; i++) {
-    LOG_INFO("i = %u", i);
-    LOG_INFO("pin_mask = %lu", pin_mask);
     /* Call the handler if there is one registered for this event */
     if((pin_mask & (1 << i)) && handlers[i] != NULL) {
-        LOG_INFO("registered i = %u", i);
-        LOG_INFO("registered pin_mask = %lu", pin_mask);
       handlers[i](i);
     }
   }
@@ -96,7 +91,6 @@ gpio_interrupt_register_handler(uint8_t ioid, gpio_interrupt_handler_t f)
 
   /* Re-enable interrupts */
   if(!interrupts_disabled) {
-    LOG_INFO("enabling interrupts\n");
     ti_lib_int_master_enable();
   }
 }
@@ -113,8 +107,6 @@ gpio_interrupt_init()
   ti_lib_int_register(INT_AON_GPIO_EDGE, GPIOIntHandler);
   ti_lib_int_priority_set(INT_AON_GPIO_EDGE, INT_PRI_LEVEL0);
   ti_lib_int_enable(INT_AON_GPIO_EDGE);
-
-  LOG_INFO("Interrupt init\n");
 }
 /*---------------------------------------------------------------------------*/
 /** @} */

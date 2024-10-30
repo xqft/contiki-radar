@@ -2,7 +2,7 @@
 <simconf version="2023090101">
   <simulation>
     <title>My simulation</title>
-    <speedlimit>2.0</speedlimit>
+    <speedlimit>1.0</speedlimit>
     <randomseed>123456</randomseed>
     <motedelay_us>1000000</motedelay_us>
     <radiomedium>
@@ -39,7 +39,7 @@
       <mote>
         <interface_config>
           org.contikios.cooja.interfaces.Position
-          <pos x="0.6037645279887816" y="0.16647436696113566" />
+          <pos x="0.30633656649986074" y="0.16647436696113566" />
         </interface_config>
         <interface_config>
           org.contikios.cooja.contikimote.interfaces.ContikiMoteID
@@ -91,7 +91,7 @@
       <mote>
         <interface_config>
           org.contikios.cooja.interfaces.Position
-          <pos x="-20.04514172460139" y="-30.089741146470548" />
+          <pos x="-20.34385859182858" y="-18.738500191837165" />
         </interface_config>
         <interface_config>
           org.contikios.cooja.contikimote.interfaces.ContikiMoteID
@@ -101,7 +101,7 @@
       <mote>
         <interface_config>
           org.contikios.cooja.interfaces.Position
-          <pos x="-20.172459501912794" y="-49.1132219396915" />
+          <pos x="-19.77473588640575" y="-28.731937204528776" />
         </interface_config>
         <interface_config>
           org.contikios.cooja.contikimote.interfaces.ContikiMoteID
@@ -118,9 +118,9 @@
       <skin>org.contikios.cooja.plugins.skins.GridVisualizerSkin</skin>
       <skin>org.contikios.cooja.plugins.skins.TrafficVisualizerSkin</skin>
       <skin>org.contikios.cooja.plugins.skins.UDGMVisualizerSkin</skin>
-      <viewport>3.3621586719487024 0.0 0.0 3.3621586719487024 249.07167687672398 225.62655718467894</viewport>
+      <viewport>3.3476516049541747 0.0 0.0 3.3476516049541747 212.9163303732509 244.45724296891058</viewport>
     </plugin_config>
-    <bounds x="1" y="1" height="400" width="400" />
+    <bounds x="1" y="1" height="400" width="400" z="1" />
   </plugin>
   <plugin>
     org.contikios.cooja.plugins.LogListener
@@ -129,7 +129,7 @@
       <formatted_time />
       <coloring />
     </plugin_config>
-    <bounds x="400" y="160" height="476" width="1318" z="1" />
+    <bounds x="400" y="160" height="476" width="1318" />
   </plugin>
   <plugin>
     org.contikios.cooja.plugins.TimeLine
