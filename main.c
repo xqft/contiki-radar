@@ -11,39 +11,63 @@
 #define LOG_MODULE "Nodo"
 #define LOG_LEVEL LOG_LEVEL_INFO
 
-#define CLOCK_10US CLOCK_SECOND/100000
-
 #define TRIG_PIN BOARD_IOID_DIO26
 #define ECHO_PIN BOARD_IOID_DIO27
+
+#define SOUND_VEL 343000 // mm/s
+#define MIN_DISTANCE 200 // mm
 
 static struct etimer et;
 
 static gpio_hal_port_t trig = TRIG_PIN;
 static gpio_hal_port_t echo = ECHO_PIN;
 
-static process_event_t echo_event;
+static process_event_t sensor_event;
 
-void trigger_sensor() {
+void trigger_sensor()
+{
   gpio_hal_arch_set_pin(GPIO_HAL_NULL_PORT, trig);
   clock_wait(1);
   gpio_hal_arch_clear_pin(GPIO_HAL_NULL_PORT, trig);
 }
 
-PROCESS(trigger, "Sensor Control");
-AUTOSTART_PROCESSES(&trigger);
+PROCESS(sensor, "Sensor Control");
+AUTOSTART_PROCESSES(&sensor);
 
-static void echo_handler(unsigned char pin_mask) {
-  LOG_INFO("pin echo detectado\n");
-  process_post(&trigger, echo_event, NULL);
+static void echo_handler(unsigned char pin_mask)
+{
+  static rtimer_clock_t initial_time = 0;
+  static rtimer_clock_t flight_time = 0;
+  static bool is_rise_edge = true;
+
+  if (is_rise_edge)
+  {
+    // inicialmente flanco de subida
+    is_rise_edge = false;
+    initial_time = RTIMER_NOW();
+  }
+  else
+  {
+    // flanco de bajada, calculo distancia y envio evento
+    flight_time = RTIMER_NOW() - initial_time;
+
+    uint32_t distance = (SOUND_VEL * flight_time) / RTIMER_SECOND / 2;
+    LOG_INFO("%lu\n", distance);
+    if (distance <= MIN_DISTANCE)
+      process_post(&sensor, sensor_event, NULL);
+
+    is_rise_edge = true;
+  }
 }
 
-static void config_pins() {
+static void config_pins()
+{
   // trigger pin
   gpio_hal_arch_pin_set_output(GPIO_HAL_NULL_PORT, trig);
 
   // echo pin
   gpio_hal_arch_pin_set_input(GPIO_HAL_NULL_PORT, echo);
-  
+
   gpio_interrupt_init();
   gpio_hal_pin_cfg_t echo_cfg;
 
@@ -52,42 +76,27 @@ static void config_pins() {
   gpio_interrupt_register_handler(ECHO_PIN, echo_handler);
 }
 
-PROCESS_THREAD(trigger, ev, data)
+PROCESS_THREAD(sensor, ev, data)
 {
-  static clock_time_t trig_time = 0;
-  static clock_time_t flight_time = 0;
-
   PROCESS_BEGIN();
 
-  echo_event = process_alloc_event();
+  sensor_event = process_alloc_event();
 
   config_pins();
 
-  while(1) {
+  while (1)
+  {
     trigger_sensor();
-
-    // espero flanco de subida
-    PROCESS_WAIT_EVENT_UNTIL(ev == echo_event);
-    trig_time = RTIMER_NOW();
-
-    // espero flanco de bajada
-    PROCESS_WAIT_EVENT_UNTIL(ev == echo_event);
-    flight_time = RTIMER_NOW() - trig_time;
-
-    uint32_t distance = 343 * flight_time;
-    LOG_INFO("flight_time: %lu\n", flight_time);
-    LOG_INFO("distance: %lu\n", distance);
-
-    //gpio_hal_arch_toggle_pin(GPIO_HAL_NULL_PORT, trig);
-
-    etimer_set(&et, CLOCK_SECOND);
     PROCESS_YIELD();
-    if(ev == PROCESS_EVENT_TIMER && data == &et) {
-      LOG_INFO("Pins are trig=%u, echo=%u\n",
-            gpio_hal_arch_read_pin(GPIO_HAL_NULL_PORT, trig),
-            gpio_hal_arch_read_pin(GPIO_HAL_NULL_PORT, echo)
-      );
+
+    if (ev == sensor_event)
+    {
+      LOG_INFO("Vehiculo detectado\n");
+
+      etimer_set(&et, CLOCK_SECOND / 2);
+      PROCESS_WAIT_EVENT_UNTIL(ev == PROCESS_EVENT_TIMER);
     }
+    trigger_sensor();
   }
 
   PROCESS_END();
