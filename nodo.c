@@ -3,6 +3,7 @@
 #include <inttypes.h>
 
 #include "dev/button-hal.h"
+#include "dev/gpio-hal.h"
 #include "dev/leds.h"
 
 #include "sys/log.h"
@@ -14,21 +15,19 @@
 #include "net/netstack.h"
 
 #include "contiki.h"
+#ifndef COOJA
 #include "sensor.h"
+#endif
 
 #define LOG_MODULE "Nodo"
 #define LOG_LEVEL LOG_LEVEL_INFO
 
-#define VEHICLE_DETECTED_KEY "VEHICLE_AT"
-#define MAX_VEL_CHANGE_KEY "MAX_VEL"
-#define SENSOR_CHANGE_VEL "VEL MAX CHANGE"
-
 #define WITH_SERVER_REPLY 1
 #define UDP_PORT 5678
 
-#define DISTANCE 1
+#define DISTANCE 10 // distancia entre sensores, en metros
 
-static float max_vel = 0.3;
+static float max_vel = 3; // m/s
 static bool waiting_for_sensor = false;
 static struct simple_udp_connection udp_conn;
 static uint64_t t_init;
@@ -71,7 +70,7 @@ udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t *sender_addr
   {
     waiting_for_sensor = true;
     t_init = msg->value.t_init;
-    LOG_INFO("Esperando por sensor. Tiempo inicial: %llu\n", t_init);
+    LOG_INFO("Esperando por sensor. Tiempo inicial: %zu\n", t_init);
   }
   // aca la idea es que cuando por shell en el server se modifica la velocidad se recibe el msj y se cambia
   if (is_sender_server && msg->type == MAX_VEL_CHANGE)
@@ -102,6 +101,7 @@ PROCESS_THREAD(loop, ev, data)
 
   set_addresses();
   simple_udp_register(&udp_conn, UDP_PORT, NULL, UDP_PORT, udp_rx_callback);
+  if (node_id == 1) NETSTACK_ROUTING.root_start();
 
 #ifndef COOJA
   process_start(&handle_sensor, NULL);
@@ -134,13 +134,13 @@ PROCESS_THREAD(loop, ev, data)
 
       if (vel <= max_vel)
       {
-        LOG_INFO("TODO EN ORDEN");
+        LOG_INFO("TODO EN ORDEN\n");
         LOG_INFO("Velocidad detectada (m/s): %f\n", vel);
         LOG_INFO("Diferencia de tiempo (s): %f\n", delta_t);
       }
       else
       { // PODRIA VERSE DE MANDAR AL SERVER SOLO CUANDO SE SUPERA VELOCIDAD Y QUE EL MISMO PRINTEE POR UART O LOG
-        LOG_INFO("ALERTA: VELOCIDAD MAXIMA SUPERADA");
+        LOG_INFO("ALERTA: VELOCIDAD MAXIMA SUPERADA\n");
         LOG_INFO("Velocidad detectada (m/s): %f\n", vel);
         LOG_INFO("Diferencia de tiempo (s): %f\n", delta_t);
       }
