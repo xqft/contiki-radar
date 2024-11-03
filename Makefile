@@ -1,6 +1,8 @@
 CONTIKI_PROJECT = nodo udp-server
 all: $(CONTIKI_PROJECT)
 
+PROJECT_SOURCEFILES += sensor.c
+
 MAKE_MAC = MAKE_MAC_TSCH
 
 CONTIKI = /home/user/contiki-ng

@@ -1,14 +1,16 @@
+#include <stdio.h>
+
 #include "contiki.h"
 #include "dev/gpio-hal.h"
-#include "gpio-interrupt.h"
 #include "sys/etimer.h"
 #include "sys/rtimer.h"
 #include "sys/log.h"
 #include "sys/int-master.h"
 
-#include <stdio.h>
+#include "gpio-interrupt.h"
+#include "sensor.h"
 
-#define LOG_MODULE "Nodo"
+#define LOG_MODULE "Sensor"
 #define LOG_LEVEL LOG_LEVEL_INFO
 
 #define TRIG_PIN BOARD_IOID_DIO26
@@ -22,8 +24,12 @@ static struct etimer et;
 static gpio_hal_port_t trig = TRIG_PIN;
 static gpio_hal_port_t echo = ECHO_PIN;
 
-static process_event_t sensor_event;
+// Evento al detectar un vehiculo.
+process_event_t vehicle_event;
+// Evento al recibir una senal del sensor que no se trata de un vehiculo.
+process_event_t no_vehicle_event;
 
+// Dispara el sensor
 void trigger_sensor()
 {
   gpio_hal_arch_set_pin(GPIO_HAL_NULL_PORT, trig);
@@ -31,9 +37,7 @@ void trigger_sensor()
   gpio_hal_arch_clear_pin(GPIO_HAL_NULL_PORT, trig);
 }
 
-PROCESS(sensor, "Sensor Control");
-AUTOSTART_PROCESSES(&sensor);
-
+// Administra interrupcion del pin ECHO
 static void echo_handler(unsigned char pin_mask)
 {
   static rtimer_clock_t initial_time = 0;
@@ -48,18 +52,25 @@ static void echo_handler(unsigned char pin_mask)
   }
   else
   {
-    // flanco de bajada, calculo distancia y envio evento
+    // flanco de bajada, calculo distancia y envio eventos
     flight_time = RTIMER_NOW() - initial_time;
 
     uint32_t distance = (SOUND_VEL * flight_time) / RTIMER_SECOND / 2;
-    LOG_INFO("%lu\n", distance);
     if (distance <= MIN_DISTANCE)
-      process_post(&sensor, sensor_event, NULL);
+    {
+      process_post(&handle_sensor, vehicle_event, NULL);
+      process_post(PROCESS_BROADCAST, vehicle_event, NULL);
+    }
+    else
+    {
+      process_post(&handle_sensor, no_vehicle_event, NULL);
+    }
 
     is_rise_edge = true;
   }
 }
 
+// Configuracion inicial de pins
 static void config_pins()
 {
   // trigger pin
@@ -76,11 +87,15 @@ static void config_pins()
   gpio_interrupt_register_handler(ECHO_PIN, echo_handler);
 }
 
-PROCESS_THREAD(sensor, ev, data)
+// Proceso para administrar el sensor
+PROCESS(handle_sensor, "Handle sensor");
+PROCESS_THREAD(handle_sensor, ev, data)
 {
   PROCESS_BEGIN();
+  LOG_INFO("Inicio proceso handle_sensor");
 
-  sensor_event = process_alloc_event();
+  vehicle_event = process_alloc_event();
+  no_vehicle_event = process_alloc_event();
 
   config_pins();
 
@@ -89,14 +104,19 @@ PROCESS_THREAD(sensor, ev, data)
     trigger_sensor();
     PROCESS_YIELD();
 
-    if (ev == sensor_event)
+    if (ev == no_vehicle_event)
+    {
+      // si no se detecto un vehiculo, vuelve a disparar el sensor inmediatamente.
+      continue;
+    }
+    else if (ev == vehicle_event)
     {
       LOG_INFO("Vehiculo detectado\n");
 
+      // espera 0.5 segundos antes de detectar el siguiente vehiculo.
       etimer_set(&et, CLOCK_SECOND / 2);
       PROCESS_WAIT_EVENT_UNTIL(ev == PROCESS_EVENT_TIMER);
     }
-    trigger_sensor();
   }
 
   PROCESS_END();
