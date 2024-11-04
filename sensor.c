@@ -55,10 +55,9 @@ static void echo_handler(unsigned char pin_mask)
     // flanco de bajada, calculo distancia y envio eventos
     flight_time = RTIMER_NOW() - initial_time;
 
-    uint32_t distance = (SOUND_VEL * flight_time) / RTIMER_SECOND / 2;
+    uint32_t distance = (SOUND_VEL * flight_time) / RTIMER_SECOND / 2; // in mm
     if (distance <= MIN_DISTANCE)
     {
-      process_post(&handle_sensor, vehicle_event, NULL);
       process_post(PROCESS_BROADCAST, vehicle_event, NULL);
     }
     else

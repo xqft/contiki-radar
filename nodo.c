@@ -15,6 +15,7 @@
 #include "net/netstack.h"
 
 #include "contiki.h"
+#include "msg.h"
 #ifndef COOJA
 #include "sensor.h"
 #endif
@@ -35,22 +36,7 @@ static uint64_t t_init;
 static uip_ipaddr_t ip_server;
 static uip_ipaddr_t ip_next;
 static uip_ipaddr_t ip_prev;
-
-typedef enum
-{
-  VEHICLE_DETECTED,
-  MAX_VEL_CHANGE
-} msg_type_t;
-
-typedef struct
-{
-  msg_type_t type;
-  union
-  {
-    uint64_t t_init;
-    float new_max_vel;
-  } value;
-} msg_t;
+static uip_ipaddr_t ip_multicast;
 
 static void
 udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t *sender_addr, uint16_t sender_port, const uip_ipaddr_t *receiver_addr, uint16_t receiver_port, const uint8_t *data, uint16_t datalen)
@@ -63,7 +49,7 @@ udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t *sender_addr
   msg_t *msg = (msg_t *)data;
 
   bool is_sender_prev_node = uip_ip6addr_cmp(sender_addr, &ip_prev);
-  bool is_sender_server = uip_ip6addr_cmp(sender_addr, &ip_server);
+  bool is_sender_multicast = uip_ip6addr_cmp(sender_addr, &ip_multicast);
 
   // si el mensaje me lo manda el nodo anterior y es el mensaje de activacion de sensor
   if (is_sender_prev_node && msg->type == VEHICLE_DETECTED)
@@ -73,10 +59,10 @@ udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t *sender_addr
     LOG_INFO("Esperando por sensor. Tiempo inicial: %zu\n", t_init);
   }
   // aca la idea es que cuando por shell en el server se modifica la velocidad se recibe el msj y se cambia
-  if (is_sender_server && msg->type == MAX_VEL_CHANGE)
+  if (is_sender_multicast && msg->type == MAX_VEL_CHANGE)
   {
     max_vel = msg->value.new_max_vel;
-    LOG_INFO("Nueva velocidad maxima establecida: %f\n", max_vel);
+    LOG_INFO("Nueva velocidad maxima establecida: %.2f\n", max_vel);
   }
 }
 
@@ -88,6 +74,7 @@ static void set_addresses()
   // se asume que estan ordenados crecientes en el espacio fisico y configurados correctamente
   uip_ip6addr(&ip_next, 0xfd00, 0x0000, 0x0000, 0x0000, 0x0201 + node_id, node_id + 1, node_id + 1, node_id + 1);
   uip_ip6addr(&ip_prev, 0xfd00, 0x0000, 0x0000, 0x0000, 0x0200 + node_id - 1, node_id - 1, node_id - 1, node_id - 1);
+  uip_ip6addr(&ip_multicast, 0xfe80, 0x0000, 0x0000, 0x0000, 0x0201, 1, 1, 1);
 }
 
 PROCESS(loop, "Main loop process");
@@ -135,17 +122,21 @@ PROCESS_THREAD(loop, ev, data)
       if (vel <= max_vel)
       {
         LOG_INFO("TODO EN ORDEN\n");
-        LOG_INFO("Velocidad detectada (m/s): %f\n", vel);
-        LOG_INFO("Diferencia de tiempo (s): %f\n", delta_t);
+        LOG_INFO("Velocidad detectada (m/s): %.2f\n", vel);
+        LOG_INFO("Diferencia de tiempo (s): %.2f\n", delta_t);
       }
       else
       { // PODRIA VERSE DE MANDAR AL SERVER SOLO CUANDO SE SUPERA VELOCIDAD Y QUE EL MISMO PRINTEE POR UART O LOG
         LOG_INFO("ALERTA: VELOCIDAD MAXIMA SUPERADA\n");
-        LOG_INFO("Velocidad detectada (m/s): %f\n", vel);
-        LOG_INFO("Diferencia de tiempo (s): %f\n", delta_t);
+        LOG_INFO("Velocidad detectada (m/s): %.2f\n", vel);
+        LOG_INFO("Diferencia de tiempo (s): %.2f\n", delta_t);
       }
-      snprintf(str, sizeof(str), "VEL:%f", vel);
-      simple_udp_sendto(&udp_conn, str, strlen(str), &ip_server);
+      LOG_INFO("Velocidad maxima permitida: %.2f\n", max_vel);
+
+      if (node_id != 1) {
+        snprintf(str, sizeof(str), "VEL:%f", vel);
+        simple_udp_sendto(&udp_conn, str, strlen(str), &ip_server);
+      }
 
       waiting_for_sensor = false;
     }
