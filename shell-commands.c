@@ -198,6 +198,58 @@ static PT_THREAD(cmd_velmax(struct pt *pt, shell_output_func output, char *args)
   PT_END(pt);
 }
 /*---------------------------------------------------------------------------*/
+static PT_THREAD(cmd_dist(struct pt *pt, shell_output_func output, char *args))
+{
+  static double dist;
+  char *next_args;
+  char *endptr;
+  simple_udp_register(&udp_conn, UDP_PORT, NULL, UDP_PORT, udp_rx_callback);
+
+  PT_BEGIN(pt);
+
+  if (node_id != 1) {
+    SHELL_OUTPUT(output, "Este nodo no es el server\n");
+    PT_EXIT(pt);
+  }
+
+  SHELL_ARGS_INIT(args, next_args);
+
+  /* Get argument (expected integer) */
+  SHELL_ARGS_NEXT(args, next_args);
+  if (args == NULL)
+  {
+    SHELL_OUTPUT(output, "Nueva distancia no especificada\n");
+    PT_EXIT(pt);
+  }
+  else
+  {
+    // Try to parse as an integer
+    dist = strtod(args, &endptr);
+
+    // Check if the entire string was parsed as an integer
+    if (*endptr != '\0')
+    {
+      SHELL_OUTPUT(output, "Nro de distancia invalido %s\n", args);
+      PT_EXIT(pt);
+    }
+  }
+
+  SHELL_OUTPUT(output, "Seteando nueva distancia: %.2f", dist);
+  SHELL_OUTPUT(output, "\n");
+
+  /* Send message to nodes to change max allowed speed */
+
+  uip_ip6addr(&ip_multicast, 0xff02, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0001);
+  msg_t msg = 
+  {
+    .type = DISTANCE_CHANGE, 
+    .value = {.new_distance = dist}
+  };
+  simple_udp_sendto(&udp_conn, &msg, sizeof(msg_t), &ip_multicast);
+
+  PT_END(pt);
+}
+/*---------------------------------------------------------------------------*/
 static PT_THREAD(cmd_ping(struct pt *pt, shell_output_func output, char *args))
 {
   static uip_ipaddr_t remote_addr;
@@ -1203,7 +1255,7 @@ const struct shell_command_t builtin_shell_commands[] = {
 #if NETSTACK_CONF_WITH_IPV6
     {"ip-addr", cmd_ipaddr, "'> ip-addr': Shows all IPv6 addresses"},
     {"ip-nbr", cmd_ip_neighbors, "'> ip-nbr': Shows all IPv6 neighbors"},
-
+    {"distance", cmd_dist, "'> distance nro': setea la distancia entre sensores"},
     {"velmax", cmd_velmax, "'> velmax nro': setea la velocidad maxima permitida"},
     {"routes", cmd_routes, "'> routes': Shows the route entries"},
 #if BUILD_WITH_RESOLV

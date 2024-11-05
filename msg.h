@@ -3,7 +3,8 @@
 typedef enum
 {
   VEHICLE_DETECTED,
-  MAX_VEL_CHANGE
+  MAX_VEL_CHANGE,
+  DISTANCE_CHANGE
 } msg_type_t;
 
 typedef struct
@@ -13,5 +14,6 @@ typedef struct
   {
     uint64_t t_init;
     float new_max_vel;
+    float new_distance;
   } value;
 } msg_t;

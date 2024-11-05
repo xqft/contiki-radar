@@ -26,8 +26,8 @@
 #define WITH_SERVER_REPLY 1
 #define UDP_PORT 5678
 
-#define DISTANCE 10 // distancia entre sensores, en metros
-
+//#define DISTANCE 10 // distancia entre sensores, en metros
+static float distance = 10; //m
 static float max_vel = 3; // m/s
 static bool waiting_for_sensor = false;
 static struct simple_udp_connection udp_conn;
@@ -63,6 +63,12 @@ udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t *sender_addr
   {
     max_vel = msg->value.new_max_vel;
     LOG_INFO("Nueva velocidad maxima establecida: %.2f\n", max_vel);
+  }
+  // se modifica la distancia por shell
+    if (is_sender_multicast && msg->type == DISTANCE_CHANGE)
+  {
+    distance = msg->value.new_distance;
+    LOG_INFO("Nueva distancia entre sensores establecida: %.2f\n", distance);
   }
 }
 
@@ -117,7 +123,7 @@ PROCESS_THREAD(loop, ev, data)
       // parar timer, calcular velocidad(en ticks)
       float delta_ticks = t_now - t_init;
       float delta_t = delta_ticks / CLOCK_SECOND;
-      float vel = DISTANCE / delta_t;
+      float vel = distance / delta_t;
 
       if (vel <= max_vel)
       {
