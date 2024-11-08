@@ -98,21 +98,28 @@ PROCESS_THREAD(handle_sensor, ev, data)
 
   while (1)
   {
+    etimer_set(&et, CLOCK_SECOND * 3); // timeout si se omite una interrupcion
     trigger_sensor();
     PROCESS_YIELD();
 
     if (ev == no_vehicle_event)
     {
-      // si no se detecto un vehiculo, vuelve a disparar el sensor inmediatamente.
+      // si no se detecto un vehiculo, paro el timer de timeout y 
+      // vuelve a disparar el sensor inmediatamente.
+      etimer_stop(&et);
       continue;
     }
     else if (ev == vehicle_event)
     {
+      etimer_stop(&et);
       LOG_INFO("Vehiculo detectado\n");
 
       // espera 0.5 segundos antes de detectar el siguiente vehiculo.
       etimer_set(&et, CLOCK_SECOND / 2);
       PROCESS_WAIT_EVENT_UNTIL(ev == PROCESS_EVENT_TIMER);
+    } else if (ev == PROCESS_EVENT_TIMER) {
+      LOG_INFO("Sensor timeout\n");
+      continue;
     }
   }
 
