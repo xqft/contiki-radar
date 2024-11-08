@@ -28,15 +28,14 @@
 #define UDP_PORT 5678
 
 //#define DISTANCE 10 // distancia entre sensores, en metros
-static float distance = 10; //m
-static float max_vel = 3; // m/s
+static uint32_t distance = 10; //m
+static uint32_t max_vel = 3; // m/s
 static bool waiting_for_sensor = false;
 static struct simple_udp_connection udp_conn;
 static uint64_t t_init;
 
 static uip_ipaddr_t ip_server;
 static uip_ipaddr_t ip_next;
-static uip_ipaddr_t ip_current;
 static uip_ipaddr_t ip_prev;
 static uip_ipaddr_t ip_multicast;
 
@@ -64,13 +63,13 @@ udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t *sender_addr
   if (is_sender_multicast && msg->type == MAX_VEL_CHANGE)
   {
     max_vel = msg->value.new_max_vel;
-    LOG_INFO("Nueva velocidad maxima establecida: %.2f\n", max_vel);
+    LOG_INFO("Nueva velocidad maxima establecida: %lu\n", max_vel);
   }
   // se modifica la distancia por shell
     if (is_sender_multicast && msg->type == DISTANCE_CHANGE)
   {
     distance = msg->value.new_distance;
-    LOG_INFO("Nueva distancia entre sensores establecida: %.2f\n", distance);
+    LOG_INFO("Nueva distancia entre sensores establecida: %lu\n", distance);
   }
 }
 
@@ -123,26 +122,26 @@ PROCESS_THREAD(loop, ev, data)
     if (waiting_for_sensor)
     {
       // parar timer, calcular velocidad(en ticks)
-      float delta_ticks = t_now - t_init;
-      float delta_t = delta_ticks / CLOCK_SECOND;
-      float vel = distance / delta_t;
+      uint32_t delta_ticks = t_now - t_init;
+      uint32_t delta_t = delta_ticks / CLOCK_SECOND;
+      uint32_t vel = distance * 60 * 60 / delta_t / 1000;
 
       if (vel <= max_vel)
       {
         LOG_INFO("TODO EN ORDEN\n");
-        LOG_INFO("Velocidad detectada (m/s): %.2f\n", vel);
-        LOG_INFO("Diferencia de tiempo (s): %.2f\n", delta_t);
+        LOG_INFO("Velocidad detectada (k/h): %lu\n", vel);
+        LOG_INFO("Diferencia de tiempo (s): %lu\n", delta_t);
       }
       else
       { // PODRIA VERSE DE MANDAR AL SERVER SOLO CUANDO SE SUPERA VELOCIDAD Y QUE EL MISMO PRINTEE POR UART O LOG
         LOG_INFO("ALERTA: VELOCIDAD MAXIMA SUPERADA\n");
-        LOG_INFO("Velocidad detectada (m/s): %.2f\n", vel);
-        LOG_INFO("Diferencia de tiempo (s): %.2f\n", delta_t);
+        LOG_INFO("Velocidad detectada (k/h): %lu\n", vel);
+        LOG_INFO("Diferencia de tiempo (s): %lu\n", delta_t);
       }
-      LOG_INFO("Velocidad maxima permitida: %.2f\n", max_vel);
+      LOG_INFO("Velocidad maxima permitida: %lu\n", max_vel);
 
       if (node_id != 1) {
-        snprintf(str, sizeof(str), "VEL:%f", vel);
+        snprintf(str, sizeof(str), "VEL:%lu", vel);
         simple_udp_sendto(&udp_conn, str, strlen(str), &ip_server);
       }
 
