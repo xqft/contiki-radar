@@ -27,8 +27,8 @@
 #define WITH_SERVER_REPLY 1
 #define UDP_PORT 5678
 
-static uint32_t distance = 10; //m
-static uint32_t max_vel = 3; // m/s
+static uint32_t distance = 10; // m
+static uint32_t max_vel = 3;   // km/h
 static bool waiting_for_sensor = false;
 static struct simple_udp_connection udp_conn;
 static uint64_t t_init;
@@ -65,25 +65,33 @@ udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t *sender_addr
     LOG_INFO("Nueva velocidad maxima establecida: %lu\n", max_vel);
   }
   // se modifica la distancia por shell
-    if (is_sender_server && msg->type == DISTANCE_CHANGE)
+  if (is_sender_server && msg->type == DISTANCE_CHANGE)
   {
     distance = msg->value.new_distance;
     LOG_INFO("Nueva distancia entre sensores establecida: %lu\n", distance);
+  }
+
+  if (msg->type == VEL_ALERT)
+  {
+    LOG_INFO("Alerta de velocidad maxima superada. Detectada en nodo %u, con velocidad %lu km/h\n", 
+      msg->value.vel_alert_data.node_id, 
+      msg->value.vel_alert_data.vel
+    );
   }
 }
 
 static void set_addresses()
 {
 
-  #ifdef COOJA
+#ifdef COOJA
   uip_ip6addr(&ip_server, 0xfd00, 0, 0, 0, 0x0201, 1, 1, 1);
-  uip_ip6addr(&ip_next,   0xfd00, 0, 0, 0, 0x0201 + node_id, node_id + 1, node_id + 1, node_id + 1);
-  uip_ip6addr(&ip_prev,   0xfd00, 0, 0, 0, 0x0200 + node_id - 1, node_id - 1, node_id - 1, node_id - 1);
-  #else
+  uip_ip6addr(&ip_next, 0xfd00, 0, 0, 0, 0x0201 + node_id, node_id + 1, node_id + 1, node_id + 1);
+  uip_ip6addr(&ip_prev, 0xfd00, 0, 0, 0, 0x0200 + node_id - 1, node_id - 1, node_id - 1, node_id - 1);
+#else
   uip_ip6addr(&ip_server, 0xfd00, 0, 0, 0, 0x0212, 0x4b00, 0x1204, 1);
-  uip_ip6addr(&ip_next,   0xfd00, 0, 0, 0, 0x0212, 0x4b00, 0x1204, node_id + 1);
-  uip_ip6addr(&ip_prev,   0xfd00, 0, 0, 0, 0x0212, 0x4b00, 0x1204, node_id - 1);
-  #endif
+  uip_ip6addr(&ip_next, 0xfd00, 0, 0, 0, 0x0212, 0x4b00, 0x1204, node_id + 1);
+  uip_ip6addr(&ip_prev, 0xfd00, 0, 0, 0, 0x0212, 0x4b00, 0x1204, node_id - 1);
+#endif
   uip_ip6addr(&ip_multicast, 0xff02, 0, 0, 0, 0, 0, 0, 0x1a);
 }
 
@@ -98,7 +106,8 @@ PROCESS_THREAD(loop, ev, data)
 
   set_addresses();
   simple_udp_register(&udp_conn, UDP_PORT, NULL, UDP_PORT, udp_rx_callback);
-  if (node_id == 1) NETSTACK_ROUTING.root_start();
+  if (node_id == 1)
+    NETSTACK_ROUTING.root_start();
 
 #ifndef COOJA
   process_start(&handle_sensor, NULL);
@@ -115,9 +124,9 @@ PROCESS_THREAD(loop, ev, data)
     uint64_t t_now = tsch_get_network_uptime_ticks();
 
     // mandar mensaje a siguiente nodo
-    msg_t msg = 
+    msg_t msg =
     {
-      .type = VEHICLE_DETECTED, 
+      .type = VEHICLE_DETECTED,
       .value = {.t_init = t_now}
     };
     simple_udp_sendto(&udp_conn, &msg, sizeof(msg_t), &ip_next);
@@ -127,25 +136,20 @@ PROCESS_THREAD(loop, ev, data)
       // parar timer, calcular velocidad(en ticks)
       uint32_t delta_ticks = t_now - t_init;
       uint32_t delta_t = delta_ticks / CLOCK_SECOND;
-      uint32_t vel = distance * 60 * 60 / delta_t / 1000;
+      uint32_t vel = distance * 60 * 60 / delta_t / 1000; // km/h
 
-      if (vel <= max_vel)
+      LOG_INFO("Velocidad detectada: %lu km/h\n", vel);
+
+      if (vel > max_vel)
       {
-        LOG_INFO("TODO EN ORDEN\n");
-        LOG_INFO("Velocidad detectada (k/h): %lu\n", vel);
-        LOG_INFO("Diferencia de tiempo (s): %lu\n", delta_t);
-      }
-      else
-      { // PODRIA VERSE DE MANDAR AL SERVER SOLO CUANDO SE SUPERA VELOCIDAD Y QUE EL MISMO PRINTEE POR UART O LOG
-        LOG_INFO("ALERTA: VELOCIDAD MAXIMA SUPERADA\n");
-        LOG_INFO("Velocidad detectada (k/h): %lu\n", vel);
-        LOG_INFO("Diferencia de tiempo (s): %lu\n", delta_t);
-      }
-      LOG_INFO("Velocidad maxima permitida: %lu\n", max_vel);
-
-      if (node_id != 1) {
-        snprintf(str, sizeof(str), "VEL:%lu", vel);
-        simple_udp_sendto(&udp_conn, str, strlen(str), &ip_server);
+        LOG_INFO("Limite superado, enviando alerta al servidor\n");
+        msg_t msg_alert =
+        {
+          .type = VEL_ALERT,
+          .value = {.vel_alert_data = {.node_id = node_id, .vel = vel}}
+        };
+        simple_udp_sendto(&udp_conn, &msg_alert, sizeof(msg_t), &ip_server);
+        LOG_INFO("Velocidad maxima permitida: %lu\n", max_vel);
       }
 
       waiting_for_sensor = false;
