@@ -13,7 +13,7 @@ typedef struct
   union
   {
     uint64_t t_init;
-    float new_max_vel;
-    float new_distance;
+    uint32_t new_max_vel;
+    uint32_t new_distance;
   } value;
 } msg_t;
