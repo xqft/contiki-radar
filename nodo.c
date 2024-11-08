@@ -27,7 +27,6 @@
 #define WITH_SERVER_REPLY 1
 #define UDP_PORT 5678
 
-//#define DISTANCE 10 // distancia entre sensores, en metros
 static uint32_t distance = 10; //m
 static uint32_t max_vel = 3; // m/s
 static bool waiting_for_sensor = false;
@@ -75,13 +74,17 @@ udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t *sender_addr
 
 static void set_addresses()
 {
-  // DEFINIR BIEN LAS IP
-  //  server node id = 1
-  uip_ip6addr(&ip_server, 0xfd00, 0x0000, 0x0000, 0x0000, 0x0201, 1, 1, 1);
-  // se asume que estan ordenados crecientes en el espacio fisico y configurados correctamente
-  uip_ip6addr(&ip_next, 0xfd00, 0x0000, 0x0000, 0x0000, 0x0201 + node_id, node_id + 1, node_id + 1, node_id + 1);
-  uip_ip6addr(&ip_prev, 0xfd00, 0x0000, 0x0000, 0x0000, 0x0200 + node_id - 1, node_id - 1, node_id - 1, node_id - 1);
-  uip_ip6addr(&ip_multicast, 0xfe80, 0x0000, 0x0000, 0x0000, 0x0201, 1, 1, 1);
+
+  #ifdef COOJA
+  uip_ip6addr(&ip_server, 0xfd00, 0, 0, 0, 0x0201, 1, 1, 1);
+  uip_ip6addr(&ip_next,   0xfd00, 0, 0, 0, 0x0201 + node_id, node_id + 1, node_id + 1, node_id + 1);
+  uip_ip6addr(&ip_prev,   0xfd00, 0, 0, 0, 0x0200 + node_id - 1, node_id - 1, node_id - 1, node_id - 1);
+  #else
+  uip_ip6addr(&ip_server, 0xfd00, 0, 0, 0, 0x0212, 0x4b00, 0x1204, 1);
+  uip_ip6addr(&ip_next,   0xfd00, 0, 0, 0, 0x0212, 0x4b00, 0x1204, node_id + 1);
+  uip_ip6addr(&ip_prev,   0xfd00, 0, 0, 0, 0x0212, 0x4b00, 0x1204, node_id - 1);
+  #endif
+  uip_ip6addr(&ip_multicast, 0xff02, 0, 0, 0, 0, 0, 0, 0x1a);
 }
 
 PROCESS(loop, "Main loop process");
