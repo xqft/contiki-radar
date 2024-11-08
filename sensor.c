@@ -1,5 +1,3 @@
-#include <stdio.h>
-
 #include "contiki.h"
 #include "dev/gpio-hal.h"
 #include "sys/etimer.h"

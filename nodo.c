@@ -1,10 +1,11 @@
 #include <stdio.h>
 #include <stdint.h>
-#include <inttypes.h>
 
+#ifdef COOJA
 #include "dev/button-hal.h"
+#else
 #include "dev/gpio-hal.h"
-#include "dev/leds.h"
+#endif
 
 #include "sys/log.h"
 #include "sys/node-id.h"
@@ -35,6 +36,7 @@ static uint64_t t_init;
 
 static uip_ipaddr_t ip_server;
 static uip_ipaddr_t ip_next;
+static uip_ipaddr_t ip_current;
 static uip_ipaddr_t ip_prev;
 static uip_ipaddr_t ip_multicast;
 
@@ -56,7 +58,7 @@ udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t *sender_addr
   {
     waiting_for_sensor = true;
     t_init = msg->value.t_init;
-    LOG_INFO("Esperando por sensor. Tiempo inicial: %zu\n", t_init);
+    LOG_INFO("Esperando por sensor. Tiempo inicial: %llu\n", t_init);
   }
   // aca la idea es que cuando por shell en el server se modifica la velocidad se recibe el msj y se cambia
   if (is_sender_multicast && msg->type == MAX_VEL_CHANGE)
