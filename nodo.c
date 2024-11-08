@@ -100,8 +100,6 @@ AUTOSTART_PROCESSES(&loop);
 
 PROCESS_THREAD(loop, ev, data)
 {
-  static char str[64];
-
   PROCESS_BEGIN();
 
   set_addresses();
