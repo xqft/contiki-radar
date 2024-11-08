@@ -49,7 +49,7 @@ udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t *sender_addr
   msg_t *msg = (msg_t *)data;
 
   bool is_sender_prev_node = uip_ip6addr_cmp(sender_addr, &ip_prev);
-  bool is_sender_multicast = uip_ip6addr_cmp(sender_addr, &ip_multicast);
+  bool is_sender_server = uip_ip6addr_cmp(sender_addr, &ip_server);
 
   // si el mensaje me lo manda el nodo anterior y es el mensaje de activacion de sensor
   if (is_sender_prev_node && msg->type == VEHICLE_DETECTED)
@@ -59,13 +59,13 @@ udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t *sender_addr
     LOG_INFO("Esperando por sensor. Tiempo inicial: %llu\n", t_init);
   }
   // aca la idea es que cuando por shell en el server se modifica la velocidad se recibe el msj y se cambia
-  if (is_sender_multicast && msg->type == MAX_VEL_CHANGE)
+  if (is_sender_server && msg->type == MAX_VEL_CHANGE)
   {
     max_vel = msg->value.new_max_vel;
     LOG_INFO("Nueva velocidad maxima establecida: %lu\n", max_vel);
   }
   // se modifica la distancia por shell
-    if (is_sender_multicast && msg->type == DISTANCE_CHANGE)
+    if (is_sender_server && msg->type == DISTANCE_CHANGE)
   {
     distance = msg->value.new_distance;
     LOG_INFO("Nueva distancia entre sensores establecida: %lu\n", distance);

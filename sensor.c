@@ -89,7 +89,7 @@ PROCESS(handle_sensor, "Handle sensor");
 PROCESS_THREAD(handle_sensor, ev, data)
 {
   PROCESS_BEGIN();
-  LOG_INFO("Inicio proceso handle_sensor");
+  LOG_INFO("Inicio proceso handle_sensor\n");
 
   vehicle_event = process_alloc_event();
   no_vehicle_event = process_alloc_event();
