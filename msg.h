@@ -16,7 +16,7 @@ typedef struct
     uint64_t t_init;
     uint32_t new_max_vel;
     uint32_t new_distance;
-    union {
+    struct {
       uint16_t node_id;
       uint32_t vel;
     } vel_alert_data;
