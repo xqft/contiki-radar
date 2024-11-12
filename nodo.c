@@ -1,17 +1,15 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#ifdef COOJA
 #include "dev/button-hal.h"
-#else
 #include "dev/gpio-hal.h"
-#endif
 
 #include "sys/log.h"
 #include "sys/node-id.h"
 #include "sys/timer.h"
 
 #include "net/ipv6/simple-udp.h"
+#include "net/ipv6/multicast/uip-mcast6.h"
 #include "net/mac/tsch/tsch.h"
 #include "net/netstack.h"
 
@@ -36,7 +34,6 @@ static uint64_t t_init;
 static uip_ipaddr_t ip_server;
 static uip_ipaddr_t ip_next;
 static uip_ipaddr_t ip_prev;
-static uip_ipaddr_t ip_multicast;
 
 static void
 udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t *sender_addr, uint16_t sender_port, const uip_ipaddr_t *receiver_addr, uint16_t receiver_port, const uint8_t *data, uint16_t datalen)
@@ -56,24 +53,40 @@ udp_rx_callback(struct simple_udp_connection *c, const uip_ipaddr_t *sender_addr
   {
     waiting_for_sensor = true;
     t_init = msg->value.t_init;
+    #ifdef COOJA
+    LOG_INFO("Esperando por sensor. Tiempo inicial: %lu\n", t_init);
+    #else
     LOG_INFO("Esperando por sensor. Tiempo inicial: %llu\n", t_init);
+    #endif
   }
   // aca la idea es que cuando por shell en el server se modifica la velocidad se recibe el msj y se cambia
   if (is_sender_server && msg->type == MAX_VEL_CHANGE)
   {
     max_vel = msg->value.new_max_vel;
+    #ifdef COOJA
+    LOG_INFO("Nueva velocidad maxima establecida: %u\n", max_vel);
+    #else
     LOG_INFO("Nueva velocidad maxima establecida: %lu\n", max_vel);
+    #endif
   }
   // se modifica la distancia por shell
   if (is_sender_server && msg->type == DISTANCE_CHANGE)
   {
     distance = msg->value.new_distance;
+    #ifdef COOJA
+    LOG_INFO("Nueva distancia entre sensores establecida: %u\n", distance);
+    #else
     LOG_INFO("Nueva distancia entre sensores establecida: %lu\n", distance);
+    #endif
   }
 
   if (msg->type == VEL_ALERT)
   {
+    #ifdef COOJA
+    LOG_INFO("Alerta de velocidad maxima superada. Detectada en nodo %u, con velocidad %u km/h\n", 
+    #else
     LOG_INFO("Alerta de velocidad maxima superada. Detectada en nodo %u, con velocidad %lu km/h\n", 
+    #endif
       msg->value.vel_alert_data.node_id, 
       msg->value.vel_alert_data.vel
     );
@@ -92,7 +105,6 @@ static void set_addresses()
   uip_ip6addr(&ip_next, 0xfd00, 0, 0, 0, 0x0212, 0x4b00, 0x1204, node_id + 1);
   uip_ip6addr(&ip_prev, 0xfd00, 0, 0, 0, 0x0212, 0x4b00, 0x1204, node_id - 1);
 #endif
-  uip_ip6addr(&ip_multicast, 0xff02, 0, 0, 0, 0, 0, 0, 0x1a);
 }
 
 PROCESS(loop, "Main loop process");
@@ -136,7 +148,11 @@ PROCESS_THREAD(loop, ev, data)
       uint32_t delta_t = delta_ticks / CLOCK_SECOND;
       uint32_t vel = distance * 60 * 60 / delta_t / 1000; // km/h
 
+      #ifdef COOJA
+      LOG_INFO("Velocidad detectada: %u km/h\n", vel);
+      #else
       LOG_INFO("Velocidad detectada: %lu km/h\n", vel);
+      #endif
 
       if (vel > max_vel)
       {
@@ -147,7 +163,11 @@ PROCESS_THREAD(loop, ev, data)
           .value = {.vel_alert_data = {.node_id = node_id, .vel = vel}}
         };
         simple_udp_sendto(&udp_conn, &msg_alert, sizeof(msg_t), &ip_server);
+        #ifdef COOJA
+        LOG_INFO("Velocidad maxima permitida: %u\n", max_vel);
+        #else
         LOG_INFO("Velocidad maxima permitida: %lu\n", max_vel);
+        #endif
       }
 
       waiting_for_sensor = false;
