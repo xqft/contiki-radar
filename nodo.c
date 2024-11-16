@@ -25,8 +25,8 @@
 #define WITH_SERVER_REPLY 1
 #define UDP_PORT 5678
 
-static uint32_t distance = 10; // m
-static uint32_t max_vel = 3;   // km/h
+static uint32_t distance = 1; // m
+static uint32_t max_vel = 50;   // km/h
 static bool waiting_for_sensor = false;
 static struct simple_udp_connection udp_conn;
 static uint64_t t_init;
@@ -145,8 +145,8 @@ PROCESS_THREAD(loop, ev, data)
     {
       // parar timer, calcular velocidad(en ticks)
       uint32_t delta_ticks = t_now - t_init;
-      uint32_t delta_t = delta_ticks / CLOCK_SECOND;
-      uint32_t vel = distance * 60 * 60 / delta_t / 1000; // km/h
+      uint32_t delta_t = delta_ticks;
+      uint32_t vel = (((((distance * 60) * 60) * CLOCK_SECOND) / delta_t) / 1000); // km/h
 
       #ifdef COOJA
       LOG_INFO("Velocidad detectada: %u km/h\n", vel);
