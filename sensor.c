@@ -22,6 +22,8 @@ static struct etimer et;
 static gpio_hal_port_t trig = TRIG_PIN;
 static gpio_hal_port_t echo = ECHO_PIN;
 
+static bool is_rise_edge = true;
+
 // Evento al detectar un vehiculo.
 process_event_t vehicle_event;
 // Evento al recibir una senal del sensor que no se trata de un vehiculo.
@@ -40,7 +42,6 @@ static void echo_handler(unsigned char pin_mask)
 {
   static rtimer_clock_t initial_time = 0;
   static rtimer_clock_t flight_time = 0;
-  static bool is_rise_edge = true;
 
   if (is_rise_edge)
   {
@@ -119,6 +120,7 @@ PROCESS_THREAD(handle_sensor, ev, data)
       PROCESS_WAIT_EVENT_UNTIL(ev == PROCESS_EVENT_TIMER);
     } else if (ev == PROCESS_EVENT_TIMER) {
       LOG_INFO("Sensor timeout\n");
+      is_rise_edge = true;
       continue;
     }
   }
